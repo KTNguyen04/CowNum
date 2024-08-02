@@ -212,6 +212,6 @@ void turnLed(bool on)
 }
 void onBuzzer(int toneType)
 {
-  //ledcWriteTone(buzzerPin, toneType);
- tone(buzzerPin, toneType, buzzerDuration);
+  // ledcWriteTone(buzzerPin, toneType);
+  tone(buzzerPin, toneType, buzzerDuration);
 }
