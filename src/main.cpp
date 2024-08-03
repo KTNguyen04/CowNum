@@ -77,6 +77,9 @@ void onBuzzer(int toneType);
 void wifiConnect();
 void mqttReconnect();
 void sendINOUT();
+void callBack(char *topic, byte *message, unsigned int length);
+
+void reset();
 
 void setup()
 {
@@ -104,6 +107,7 @@ void setup()
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
   client.setServer(mqttServer, port);
+  client.setCallback(callBack);
 }
 
 void loop()
@@ -282,6 +286,7 @@ void mqttReconnect()
     if (client.connect(ID))
     {
       Serial.println(" connected");
+      client.subscribe("reset");
     }
     else
     {
@@ -297,3 +302,32 @@ void sendINOUT()
   sprintf(buffer, "{\"inC\":%d,\"outC\":%d}", inCount, outCount);
   client.publish("stat", buffer);
 }
+
+void callBack(char *topic, byte *message, unsigned int length)
+{
+  Serial.print(topic);
+  String stMessage;
+  for (int i = 0; i < length; ++i)
+  {
+    stMessage += (char)message[i];
+  }
+  if (strcmp(topic, "reset") == 0)
+  {
+    if (stMessage == "1")
+    {
+      if (inCount != 0 && outCount != 0)
+      {
+        reset();
+        sendINOUT();
+      }
+    }
+  }
+}
+
+void reset()
+{
+  inCount = outCount = 0;
+}
+
+/*firebaseapi = AIzaSyDVA5QAhBUQPVnHrBIedJCqUYAlUib6AhQ
+https://cownum-460a4-default-rtdb.firebaseio.com/*/
