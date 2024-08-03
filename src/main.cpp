@@ -2,6 +2,18 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <Arduino.h>
+#include <WiFi.h>
+#include <PubSubClient.h>
+
+const char *ssid = "Wokwi-GUEST";
+const char *password = "";
+const char *mqttServer = "test.mosquitto.org";
+const char *ID = "132201";
+int connectCount = 0;
+int port = 1883;
+
+WiFiClient espClient;
+PubSubClient client(espClient);
 
 enum
 {
@@ -40,6 +52,7 @@ int inCount = 0;
 int outCount = 0;
 int lastInCount = 0;
 int lastOutCount = 0;
+bool sendFlag = false;
 
 bool lastOutUltrasonic = false;
 bool lastInUltrasonic = false;
@@ -62,6 +75,8 @@ void turnLed(bool on = true);
 void onBuzzer(int toneType);
 
 void wifiConnect();
+void mqttReconnect();
+void sendINOUT();
 
 void setup()
 {
@@ -73,7 +88,7 @@ void setup()
   lcdDisplay(0, 0, 7, "IN");
   lcdDisplay(1, 0, 7, "OUT");
   updateLCD();
-  Serial.begin(115200);
+  Serial.begin(9600);
 
   for (int i = 0; i < n_ulso; i++)
   {
@@ -81,12 +96,42 @@ void setup()
     pinMode(echoPin[i], INPUT);
   }
   pinMode(ledPin, OUTPUT);
+
+  Serial.print("Connecting to WiFi");
+
+  wifiConnect();
+
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+  client.setServer(mqttServer, port);
 }
 
 void loop()
 {
+  if (!client.connected())
+  {
+    mqttReconnect();
+    sendINOUT();
+    connectCount++;
+    Serial.println("Connect");
+    Serial.println(connectCount);
+  }
+  client.loop();
+
   checkInUlso();
+  if (sendFlag)
+  {
+    sendINOUT();
+    sendFlag = false;
+    Serial.println("Sent.");
+  }
   checkOutUlso();
+  if (sendFlag)
+  {
+    sendINOUT();
+    sendFlag = false;
+    Serial.println("Sent.");
+  }
   updateSem();
   updateLCD();
   // Serial.println(mySemaphore0, DEC);
@@ -133,6 +178,7 @@ void checkInUlso()
     {
 
       inCount++;
+      sendFlag = true;
       lastOutUltrasonic = false;
       lastInUltrasonic = false;
       turnLed(false);
@@ -158,6 +204,7 @@ void checkOutUlso()
     {
 
       outCount++;
+      sendFlag = true;
       lastOutUltrasonic = false;
       lastInUltrasonic = false;
       turnLed(false);
@@ -214,4 +261,39 @@ void onBuzzer(int toneType)
 {
   // ledcWriteTone(buzzerPin, toneType);
   tone(buzzerPin, toneType, buzzerDuration);
+}
+
+void wifiConnect()
+{
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println(" Connected!");
+}
+
+void mqttReconnect()
+{
+  while (!client.connected())
+  {
+    Serial.print("Attempting MQTT connection... ");
+    if (client.connect(ID))
+    {
+      Serial.println(" connected");
+    }
+    else
+    {
+      Serial.println(" try again in 5 seconds");
+      delay(5000);
+    }
+  }
+}
+
+void sendINOUT()
+{
+  char buffer[50];
+  sprintf(buffer, "{\"inC\":%d,\"outC\":%d}", inCount, outCount);
+  client.publish("stat", buffer);
 }
