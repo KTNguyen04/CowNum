@@ -56,7 +56,8 @@ int inCount = 0;
 int outCount = 0;
 int lastInCount = 0;
 int lastOutCount = 0;
-bool sendResetFlag = false;
+
+bool sendINOUTFlag = false;
 
 bool lastOutUltrasonic = false;
 bool lastInUltrasonic = false;
@@ -130,17 +131,17 @@ void loop()
   client.loop();
 
   checkInUlso();
-  if (sendResetFlag)
+  if (sendINOUTFlag)
   {
     sendINOUT();
-    sendResetFlag = false;
+    sendINOUTFlag = false;
     Serial.println("\nSent.");
   }
   checkOutUlso();
-  if (sendResetFlag)
+  if (sendINOUTFlag)
   {
     sendINOUT();
-    sendResetFlag = false;
+    sendINOUTFlag = false;
     Serial.println("\nSent.");
   }
   updateSem();
@@ -194,7 +195,7 @@ void checkInUlso()
     {
 
       inCount++;
-      sendResetFlag = true;
+      sendINOUTFlag = true;
       lastOutUltrasonic = false;
       lastInUltrasonic = false;
       turnLed(false);
@@ -220,7 +221,7 @@ void checkOutUlso()
     {
 
       outCount++;
-      sendResetFlag = true;
+      sendINOUTFlag = true;
       lastOutUltrasonic = false;
       lastInUltrasonic = false;
       turnLed(false);
@@ -335,7 +336,7 @@ void callBack(char *topic, byte *message, unsigned int length)
     if (stMessage == String(confirmreset))
     {
       reset();
-      sendResetFlag = true;
+      sendINOUTFlag = true;
       Serial.println("Reset");
     }
   }
