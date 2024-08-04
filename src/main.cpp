@@ -12,6 +12,8 @@ const char *ID = "132201";
 int connectCount = 0;
 int port = 1883;
 
+const char *confirmreset = "confirmreset";
+
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -43,6 +45,8 @@ const int ledPin = 26;
 const int buzzerPin = 25;
 const int buzzerDuration = 200;
 
+const int buttonPin = 33;
+
 const int n_lcd = 2;
 LiquidCrystal_I2C lcd[n_lcd] = {
     LiquidCrystal_I2C(LCD1_ADDR, LCD_COLS, LCD_ROWS),
@@ -52,7 +56,7 @@ int inCount = 0;
 int outCount = 0;
 int lastInCount = 0;
 int lastOutCount = 0;
-bool sendFlag = false;
+bool sendResetFlag = false;
 
 bool lastOutUltrasonic = false;
 bool lastInUltrasonic = false;
@@ -77,6 +81,8 @@ void onBuzzer(int toneType);
 void wifiConnect();
 void mqttReconnect();
 void sendINOUT();
+void sendReset();
+
 void callBack(char *topic, byte *message, unsigned int length);
 
 void reset();
@@ -99,6 +105,7 @@ void setup()
     pinMode(echoPin[i], INPUT);
   }
   pinMode(ledPin, OUTPUT);
+  pinMode(buttonPin, INPUT);
 
   Serial.print("Connecting to WiFi");
 
@@ -117,29 +124,34 @@ void loop()
     mqttReconnect();
     sendINOUT();
     connectCount++;
-    Serial.println("Connect");
+    Serial.println("Connected");
     Serial.println(connectCount);
   }
   client.loop();
 
   checkInUlso();
-  if (sendFlag)
+  if (sendResetFlag)
   {
     sendINOUT();
-    sendFlag = false;
-    Serial.println("Sent.");
+    sendResetFlag = false;
+    Serial.println("\nSent.");
   }
   checkOutUlso();
-  if (sendFlag)
+  if (sendResetFlag)
   {
     sendINOUT();
-    sendFlag = false;
-    Serial.println("Sent.");
+    sendResetFlag = false;
+    Serial.println("\nSent.");
   }
   updateSem();
   updateLCD();
-  // Serial.println(mySemaphore0, DEC);
-  // Serial.println(mySemaphore1, DEC);
+
+  int resetSig = digitalRead(buttonPin);
+  if (resetSig == 1)
+  {
+    sendReset();
+    reset();
+  }
 }
 
 void lcdDisplay(int lcd_num, int row, int col, String s)
@@ -182,7 +194,7 @@ void checkInUlso()
     {
 
       inCount++;
-      sendFlag = true;
+      sendResetFlag = true;
       lastOutUltrasonic = false;
       lastInUltrasonic = false;
       turnLed(false);
@@ -208,7 +220,7 @@ void checkOutUlso()
     {
 
       outCount++;
-      sendFlag = true;
+      sendResetFlag = true;
       lastOutUltrasonic = false;
       lastInUltrasonic = false;
       turnLed(false);
@@ -302,9 +314,16 @@ void sendINOUT()
   sprintf(buffer, "{\"inC\":%d,\"outC\":%d}", inCount, outCount);
   client.publish("stat", buffer);
 }
+void sendReset()
+{
+  char buffer[50];
+  sprintf(buffer, confirmreset);
+  client.publish("reset", buffer);
+}
 
 void callBack(char *topic, byte *message, unsigned int length)
 {
+  Serial.print("topic: ");
   Serial.print(topic);
   String stMessage;
   for (int i = 0; i < length; ++i)
@@ -313,13 +332,11 @@ void callBack(char *topic, byte *message, unsigned int length)
   }
   if (strcmp(topic, "reset") == 0)
   {
-    if (stMessage == "1")
+    if (stMessage == String(confirmreset))
     {
-      if (inCount != 0 && outCount != 0)
-      {
-        reset();
-        sendINOUT();
-      }
+      reset();
+      sendResetFlag = true;
+      Serial.println("Reset");
     }
   }
 }
