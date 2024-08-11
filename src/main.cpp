@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <stdlib.h>
 
 const char *ssid = "Wokwi-GUEST";
 const char *password = "";
@@ -12,18 +13,11 @@ const char *ID = "132201";
 int connectCount = 0;
 int port = 1883;
 
-const char *confirmreset = "confirmreset";
+String confirmreset = "confirmreset";
+String confirmreset2 = "confirmreset2";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
-
-enum
-{
-  countingMode = 1,
-  warningMode
-};
-bool ledOn = true;
-bool buzzerOn = true;
 
 #define LCD1_ADDR 0x27
 #define LCD2_ADDR 0x28
@@ -61,6 +55,15 @@ bool sendINOUTFlag = false;
 
 bool lastOutUltrasonic = false;
 bool lastInUltrasonic = false;
+
+struct setting
+{
+  bool ledOn = true;
+  bool buzzer = true;
+
+  int ultrasonicDisMea = 40;
+};
+setting sett;
 
 int mySemaphore1 = 0;
 int mySemaphore0 = 0;
@@ -125,7 +128,6 @@ void loop()
     mqttReconnect();
     sendINOUT();
     connectCount++;
-    Serial.println("Connected");
     Serial.println(connectCount);
   }
   client.loop();
@@ -152,6 +154,7 @@ void loop()
   {
     sendReset();
     reset();
+    resetSig = 0;
   }
 }
 
@@ -184,7 +187,7 @@ void checkInUlso()
     downSem0();
     int dis = readUltrasonicDistance(triggerPin[0], echoPin[0]);
 
-    if (dis <= ultrasonicDisMea)
+    if (dis <= sett.ultrasonicDisMea)
     {
       lastInUltrasonic = true;
       turnLed(true);
@@ -199,7 +202,8 @@ void checkInUlso()
       lastOutUltrasonic = false;
       lastInUltrasonic = false;
       turnLed(false);
-      onBuzzer(toneIn);
+      if (sett.buzzer)
+        onBuzzer(toneIn);
     }
   }
 }
@@ -210,7 +214,7 @@ void checkOutUlso()
     downSem1();
     int dis = readUltrasonicDistance(triggerPin[1], echoPin[1]);
 
-    if (dis <= ultrasonicDisMea)
+    if (dis <= sett.ultrasonicDisMea)
     {
       lastOutUltrasonic = true;
       turnLed(true);
@@ -225,7 +229,9 @@ void checkOutUlso()
       lastOutUltrasonic = false;
       lastInUltrasonic = false;
       turnLed(false);
-      onBuzzer(toneOut);
+      if (sett.buzzer)
+
+        onBuzzer(toneOut);
     }
   }
 }
@@ -246,7 +252,7 @@ void updateSem()
     int dis1 = readUltrasonicDistance(triggerPin[1], echoPin[1]);
     int dis0 = readUltrasonicDistance(triggerPin[0], echoPin[0]);
 
-    if (dis1 > ultrasonicDisMea && dis0 > ultrasonicDisMea)
+    if (dis1 > sett.ultrasonicDisMea && dis0 > sett.ultrasonicDisMea)
     {
       upSem0();
       upSem1();
@@ -272,7 +278,8 @@ void upSem1()
 }
 void turnLed(bool on)
 {
-  digitalWrite(ledPin, on && ledOn);
+
+  digitalWrite(ledPin, on && sett.ledOn);
 }
 void onBuzzer(int toneType)
 {
@@ -300,6 +307,9 @@ void mqttReconnect()
     {
       Serial.println(" connected");
       client.subscribe("reset");
+      client.subscribe("setting/led");
+      client.subscribe("setting/buzzer");
+      client.subscribe("setting/range");
     }
     else
     {
@@ -318,7 +328,7 @@ void sendINOUT()
 void sendReset()
 {
   char buffer[50];
-  sprintf(buffer, confirmreset);
+  sprintf(buffer, confirmreset2.c_str());
   client.publish("reset", buffer);
 }
 
@@ -333,12 +343,34 @@ void callBack(char *topic, byte *message, unsigned int length)
   }
   if (strcmp(topic, "reset") == 0)
   {
-    if (stMessage == String(confirmreset))
+    if (stMessage == confirmreset)
     {
+      Serial.println(stMessage);
       reset();
       sendINOUTFlag = true;
-      Serial.println("Reset");
     }
+  }
+
+  if (strcmp(topic, "setting/led") == 0)
+  {
+    Serial.println(stMessage);
+    if (stMessage == "true")
+      sett.ledOn = true;
+    else
+      sett.ledOn = false;
+  }
+  if (strcmp(topic, "setting/buzzer") == 0)
+  {
+    Serial.println(stMessage);
+    if (stMessage == "true")
+      sett.buzzer = true;
+    else
+      sett.buzzer = false;
+  }
+  if (strcmp(topic, "setting/range") == 0)
+  {
+    Serial.println(stMessage);
+    sett.ultrasonicDisMea = atoi(stMessage.c_str());
   }
 }
 
@@ -346,6 +378,3 @@ void reset()
 {
   inCount = outCount = 0;
 }
-
-/*firebaseapi = AIzaSyDVA5QAhBUQPVnHrBIedJCqUYAlUib6AhQ
-https://cownum-460a4-default-rtdb.firebaseio.com/*/
