@@ -54,6 +54,9 @@ int lastOutCount = 0;
 bool sendINOUTFlag = false;
 bool send00Flag = false;
 
+bool resetFlag = false;
+bool isReconnect = true;
+
 bool lastOutUltrasonic = false;
 bool lastInUltrasonic = false;
 
@@ -126,15 +129,25 @@ void setup()
 
 void loop()
 {
+
   if (!client.connected())
   {
     mqttReconnect();
     sendINOUT();
     connectCount++;
     Serial.println(connectCount);
+    isReconnect = true;
+
+    Serial.println("loop");
+
+    Serial.println(isReconnect);
   }
   client.loop();
-
+  if (resetFlag)
+  {
+    reset();
+    resetFlag = false;
+  }
   checkInUlso();
   if (sendINOUTFlag)
   {
@@ -158,6 +171,7 @@ void loop()
     sendReset();
     reset();
     resetSig = 0;
+    sendINOUTFlag = true;
   }
   if (send00Flag)
   {
@@ -352,6 +366,15 @@ void sendReset()
 
 void callBack(char *topic, byte *message, unsigned int length)
 {
+  Serial.println("cb");
+
+  Serial.println(isReconnect);
+  if (isReconnect)
+  {
+    isReconnect = false;
+    return;
+  }
+
   Serial.print("topic: ");
   Serial.print(topic);
   String stMessage;
@@ -364,7 +387,10 @@ void callBack(char *topic, byte *message, unsigned int length)
     if (stMessage == confirmreset)
     {
       Serial.println(stMessage);
-      reset();
+      // reset();
+
+      resetFlag = true;
+
       sendINOUTFlag = true;
     }
   }
@@ -391,7 +417,6 @@ void callBack(char *topic, byte *message, unsigned int length)
     sett.ultrasonicDisMea = atoi(stMessage.c_str());
   }
 }
-
 void reset()
 {
   inCount = outCount = 0;
