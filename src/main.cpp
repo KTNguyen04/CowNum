@@ -52,6 +52,7 @@ int lastInCount = 0;
 int lastOutCount = 0;
 
 bool sendINOUTFlag = false;
+bool send00Flag = false;
 
 bool lastOutUltrasonic = false;
 bool lastInUltrasonic = false;
@@ -84,7 +85,9 @@ void onBuzzer(int toneType);
 
 void wifiConnect();
 void mqttReconnect();
+
 void sendINOUT();
+void send00();
 void sendReset();
 
 void callBack(char *topic, byte *message, unsigned int length);
@@ -156,6 +159,11 @@ void loop()
     reset();
     resetSig = 0;
   }
+  if (send00Flag)
+  {
+    send00();
+    send00Flag = false;
+  }
 }
 
 void lcdDisplay(int lcd_num, int row, int col, String s)
@@ -204,6 +212,8 @@ void checkInUlso()
       turnLed(false);
       if (sett.buzzer)
         onBuzzer(toneIn);
+
+      send00Flag = true;
     }
   }
 }
@@ -232,6 +242,8 @@ void checkOutUlso()
       if (sett.buzzer)
 
         onBuzzer(toneOut);
+
+      send00Flag = true;
     }
   }
 }
@@ -323,7 +335,13 @@ void sendINOUT()
 {
   char buffer[50];
   sprintf(buffer, "{\"inC\":%d,\"outC\":%d}", inCount, outCount);
-  client.publish("stat", buffer);
+  client.publish("stat/real", buffer);
+}
+void send00()
+{
+  char buffer[50];
+  sprintf(buffer, "{\"inC\":%d,\"outC\":%d}", 0, 0);
+  client.publish("stat/time", buffer);
 }
 void sendReset()
 {
