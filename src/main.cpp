@@ -387,10 +387,7 @@ void callBack(char *topic, byte *message, unsigned int length)
     if (stMessage == confirmreset)
     {
       Serial.println(stMessage);
-      // reset();
-
       resetFlag = true;
-
       sendINOUTFlag = true;
     }
   }
@@ -403,6 +400,7 @@ void callBack(char *topic, byte *message, unsigned int length)
     else
       sett.ledOn = false;
   }
+
   if (strcmp(topic, "setting/buzzer") == 0)
   {
     Serial.println(stMessage);
